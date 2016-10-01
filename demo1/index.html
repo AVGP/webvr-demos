@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+<head>
+  <title>Demo 1: Photosphere</title>
+  <style>
+    button {
+      font-size: 10em;
+      width: 3em;
+      height: 2em;
+    }
+  </style>
+</head>
+<body>
+  <button id="photo">Photo</button>
+  <button id="video">Video</button>
+
+  <script>
+  WebVRConfig = { FORCE_ENABLE_VR: true }
+  </script>
+  <script src="../webvr-polyfill.js"></script>
+  <script src="../three.min.js"></script>
+  <script src="../vrrenderer.js"></script>
+  <script src="../video-texture.js"></script>
+
+  <script>
+    var renderer = new THREE.WebGLRenderer({antialias: true}),
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200),
+        scene = new THREE.Scene(),
+        vrRenderer = new THREE.VRRenderer(renderer),
+        vTexture = null
+
+    function init() {
+      renderer.setSize(window.innerWidth, window.innerHeight)
+      document.body.appendChild(renderer.domElement)
+    }
+
+    function startVR() {
+      var frameData = new VRFrameData()
+
+      navigator.getVRDisplays().then(function(displays) {
+        if(!displays || displays.length === 0) {
+          alert('No VR displays')
+          return
+        }
+
+        vrRenderer.start(displays[0])
+
+        displays[0].requestPresent([{source: renderer.domElement}]).then(function() {
+          (function render() {
+            displays[0].requestAnimationFrame(render)
+            displays[0].getFrameData(frameData)
+
+            if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
+            if(frameData.pose.orientation) camera.quaternion.fromArray(frameData.pose.orientation)
+
+            if(vTexture) vTexture.update()
+
+            vrRenderer.render(scene, camera)
+            displays[0].submitFrame()
+          })()
+        })
+      })
+    }
+
+    function setupScene(which) {
+      var texture = null
+      switch(which) {
+        case 'photo':
+          texture = THREE.ImageUtils.loadTexture('bryce-canyon.jpg')
+        break
+        case 'video':
+          vTexture = new THREEx.VideoTexture('video2.mp4')
+          vTexture.video.play()
+          texture = vTexture.texture
+        break
+      }
+
+      var sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(100, 24, 24),
+        new THREE.MeshBasicMaterial({
+          side: THREE.BackSide,
+          map: texture
+        })
+      )
+
+      scene.add(sphere)
+    }
+
+    function removeButtons() {
+      var buttons = document.querySelectorAll('button')
+      for(var i=0; i<buttons.length; i++) document.body.removeChild(buttons[i])
+    }
+
+    document.getElementById('photo').addEventListener('click', function() {
+      removeButtons()
+      init()
+      setupScene('photo')
+      startVR()
+    })
+
+    document.getElementById('video').addEventListener('click', function() {
+      removeButtons()
+      init()
+      setupScene('video')
+      startVR()
+    })
+
+  </script>
+</body>
+</html>
