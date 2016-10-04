@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+  <title>Demo 3: Ghost party</title>
+  <style>
+    button {
+      font-size: 10em;
+      width: 5em;
+      height: 2em;
+    }
+  </style>
+</head>
+<body>
+  <button>Enter VR</button>
+
+  <script>
+  WebVRConfig = { FORCE_ENABLE_VR: true }
+  </script>
+  <script src="../webvr-polyfill.js"></script>
+  <script src="../three.min.js"></script>
+  <script src="../vrrenderer.js"></script>
+  <script src="../GLTFLoader.js"></script>
+  <script src="../video-texture.js"></script>
+
+  <script>
+    var renderer = new THREE.WebGLRenderer({antialias: true}),
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200),
+        scene = new THREE.Scene(),
+        vrRenderer = new THREE.VRRenderer(renderer),
+        holodeck = new THREE.Mesh(
+          new THREE.BoxGeometry(0.5, 0.5, 0.5),
+          new THREE.MeshBasicMaterial({
+            side: THREE.BackSide,
+            map: THREE.ImageUtils.loadTexture('floor.jpg')
+          })
+        ),
+        ghost = null,
+        skyTex = new THREEx.VideoTexture('sky.mp4'),
+        sky = new THREE.Mesh(new THREE.SphereGeometry(100, 24, 24), new THREE.MeshBasicMaterial({map: skyTex.texture, side: THREE.BackSide}))
+
+    scene.add(new THREE.AmbientLight(0x008888))
+    scene.add(camera)
+    scene.add(sky)
+
+    function init() {
+      renderer.setSize(window.innerWidth, window.innerHeight)
+      document.body.appendChild(renderer.domElement)
+    }
+
+    function startVR() {
+      var frameData = new VRFrameData()
+
+      navigator.getVRDisplays().then(function(displays) {
+        if(!displays || displays.length === 0) {
+          alert('No VR displays')
+          return
+        }
+
+        vrRenderer.start(displays[0])
+        skyTex.video.play()
+        skyTex.update()
+
+        displays[0].requestPresent([{source: renderer.domElement}]).then(function() {
+          (function render() {
+            displays[0].requestAnimationFrame(render)
+            displays[0].getFrameData(frameData)
+
+            if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
+            if(frameData.pose.orientation) camera.quaternion.fromArray(frameData.pose.orientation)
+
+//            skyTex.update()
+
+            vrRenderer.render(scene, camera)
+            displays[0].submitFrame()
+          })()
+        })
+      })
+    }
+
+    function setupScene() {
+//      scene.add(holodeck)
+
+      var loader = new THREE.GLTFLoader()
+      loader.load('ghost.gltf', function(gltf) {
+        ghost = gltf.scene
+        scene.add(ghost)
+      })
+    }
+
+    function removeButtons() {
+      var buttons = document.querySelectorAll('button')
+      for(var i=0; i<buttons.length; i++) document.body.removeChild(buttons[i])
+    }
+
+    document.querySelector('button').addEventListener('click', function() {
+      removeButtons()
+      init()
+      setupScene()
+      startVR()
+    })
+
+  </script>
+</body>
+</html>
