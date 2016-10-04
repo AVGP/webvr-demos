@@ -21,6 +21,7 @@
   <script src="../vrrenderer.js"></script>
   <script src="../GLTFLoader.js"></script>
   <script src="../video-texture.js"></script>
+  <script src="pill.js"></script>
 
   <script>
     var renderer = new THREE.WebGLRenderer({antialias: true}),
@@ -41,6 +42,12 @@
     scene.add(new THREE.AmbientLight(0x008888))
     scene.add(camera)
     scene.add(sky)
+
+    for(var i=0; i<10; i++) {
+      var pill = new Pill()
+      pill.position.set(Math.random() * 10 - 5, Math.random() * 10 - 5, Math.random() * 10 - 5)
+      scene.add(pill)
+    }
 
     function init() {
       renderer.setSize(window.innerWidth, window.innerHeight)
@@ -68,7 +75,7 @@
             if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
             if(frameData.pose.orientation) camera.quaternion.fromArray(frameData.pose.orientation)
 
-//            skyTex.update()
+            //skyTex.update()
 
             vrRenderer.render(scene, camera)
             displays[0].submitFrame()
@@ -83,6 +90,9 @@
       var loader = new THREE.GLTFLoader()
       loader.load('ghost.gltf', function(gltf) {
         ghost = gltf.scene
+        ghost.scale.set(0.25, 0.25, 0.25)
+        ghost.position.set(0, -0.25, -1)
+        //ghost.children.traverse(function(c) { if(c.material) c.material.emissive.setRGB(1, 0, 0) })
         scene.add(ghost)
       })
     }
