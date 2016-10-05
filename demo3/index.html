@@ -29,22 +29,21 @@
         camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200),
         scene = new THREE.Scene(),
         vrRenderer = new THREE.VRRenderer(renderer),
-        holodeck = new THREE.Mesh(
-          new THREE.BoxGeometry(0.5, 0.5, 0.5),
-          new THREE.MeshBasicMaterial({
+        room = new THREE.Mesh(
+          new THREE.BoxGeometry(4, 2, 8),
+          new THREE.MeshLambertMaterial({
             side: THREE.BackSide,
             map: THREE.ImageUtils.loadTexture('floor.jpg')
           })
         ),
         ghost = null,
-        sky = new THREE.Mesh(new THREE.SphereGeometry(10, 24, 24), new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture('sky.png'), side: THREE.BackSide})),
         pills = [], otherGhosts = {}, isMoving = false, connection = null, previousPos = {position: new THREE.Vector3(), orientation: new THREE.Vector3()}
 
     var peer = new Peer(getRoomId(), {key: '7nxxqfxzhestt9'});
 
     scene.add(new THREE.AmbientLight(0x008888))
     scene.add(camera)
-    scene.add(sky)
+    scene.add(room)
 
     var loader = new THREE.GLTFLoader()
     loader.load('ghost.gltf', function(gltf) {
@@ -63,7 +62,6 @@
     }
 
     function handleMsg(connection, msg) {
-      console.log('recv', msg)
       if(!otherGhosts[connection.peer]) {
         otherGhosts[connection.peer] = ghost.clone()
         scene.add(otherGhosts[connection.peer])
@@ -100,6 +98,8 @@
       renderer.domElement.addEventListener('touchend', function(e) { isMoving = false; e.preventDefault() })
       renderer.domElement.addEventListener('touchcancel', function(e) { isMoving = false; e.preventDefault() })
       renderer.domElement.addEventListener('touchleave', function(e) { isMoving = false; e.preventDefault() })
+      renderer.domElement.addEventListener('mousedown', function(e) { isMoving = true; e.preventDefault() })
+      renderer.domElement.addEventListener('mouseup', function(e) { isMoving = false; e.preventDefault() })
     }
 
     function startVR() {
@@ -118,7 +118,7 @@
             displays[0].requestAnimationFrame(render)
             displays[0].getFrameData(frameData)
 
-            if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
+//            if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
             if(frameData.pose.orientation) camera.quaternion.fromArray(frameData.pose.orientation)
 
             if(connection && (previousPos.position.distanceTo(camera.position) > 0.1 || previousPos.orientation.distanceTo(camera.rotation.toVector3()) > 0.1)) {
@@ -133,6 +133,13 @@
 
             if(isMoving) {
               camera.translateZ(-0.1)
+              camera.position.y = 0
+
+              if(camera.position.x < -1.8) camera.position.x = -1.8
+              else if(camera.position.x > 1.8) camera.position.x = 1.8
+              if(camera.position.z < -3.8) camera.position.z = -3.8
+              else if(camera.position.z > 3.8) camera.position.z = 3.8
+
               if(connection) {
                 connection.send({
                   type: 'move',
@@ -149,12 +156,6 @@
       })
     }
 
-    function setupScene() {
-      //scene.add(holodeck)
-
-      camera.position.set(Math.random() * 2 - 4, 0, Math.random() * 2 - 4)
-    }
-
     function removeButtons() {
       var buttons = document.querySelectorAll('button')
       for(var i=0; i<buttons.length; i++) document.body.removeChild(buttons[i])
@@ -165,17 +166,27 @@
 //
 
     document.querySelector('#host').addEventListener('click', function() {
+
+      var pillColors = [
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 0],
+        [0, 1, 0],
+        [1, 0, 0]
+      ]
+      for(var i=0; i<5; i++) {
+        var pill = new Pill()
+        pill.setPosition(Math.random() * 6 - 3, 0, Math.random() * 2 - 1)
+        pill.setColor(pillColors[i])
+        scene.add(pill.object)
+        pills.push(pill.object)
+      }
+
       removeButtons()
-      setupScene()
       init()
       startVR()
 
-      for(var i=0; i<10; i++) {
-        var pill = new Pill()
-        pill.position.set(Math.random() * 10 - 5, 0, Math.random() * 10 - 5)
-        scene.add(pill)
-        pills.push(pill)
-      }
+      camera.position.set(Math.random() * 6 - 3, 0, 2 + Math.random() * 2 - 1)
 
       alert('Your room ID is ' + peer.id)
 
@@ -184,7 +195,12 @@
 
         connection.send({
           type: 'init',
-          pills: pills.map(function(pill) { return pill.position.toArray() })
+          pills: pills.map(function(pill) {
+            return {
+              position: pill.position.toArray(),
+              emissive: pill.material.emissive.toArray()
+            }
+          })
         })
 
         connection.send({
@@ -206,8 +222,9 @@
 
     document.getElementById('join').addEventListener('click', function() {
       removeButtons()
-      setupScene()
       init()
+
+      camera.position.set(Math.random() * 6 - 3, 0, (Math.random() * 2 - 1) - 2)
 
       connection = peer.connect(window.prompt('What room ID to join?', ''))
       startVR()
