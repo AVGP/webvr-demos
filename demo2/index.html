@@ -28,20 +28,51 @@
         scene = new THREE.Scene(),
         vrRenderer = new THREE.VRRenderer(renderer),
         holodeck = new THREE.Mesh(
-          new THREE.BoxGeometry(0.5, 0.5, 0.5),
+          new THREE.BoxGeometry(2, 2, 2),
           new THREE.MeshBasicMaterial({
             side: THREE.BackSide,
             map: THREE.ImageUtils.loadTexture('floor.jpg')
           })
         ),
+        portals = new THREE.Object3D(),
         cursor = new VrCursor(camera)
-        model = null
+        model = null, isMoving = false, isColliding = false
+
+    var portalStahlhouse = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.2),
+      new THREE.MeshBasicMaterial({color: 0xff0000})
+    ),
+    portalMadmen = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.2),
+      new THREE.MeshBasicMaterial({color: 0x00ff00})
+    )
+    portalCorehouse = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.2),
+      new THREE.MeshBasicMaterial({color: 0x0000ff})
+    )
+
+    portalStahlhouse.position.set(-0.5, -0.3,   0)
+    portalCorehouse.position.set(  0.5, -0.3,   0)
+    portalMadmen.position.set(       0, -0.3, 0.5)
+
+    portals.add(portalMadmen)
+    portals.add(portalCorehouse)
+    portals.add(portalStahlhouse)
 
     scene.add(new THREE.AmbientLight(0xffffff))
     scene.add(camera)
+    scene.add(portals)
+    scene.add(holodeck)
+    holodeck.scale.set(3, 1, 3)
 
     function init() {
       renderer.setSize(window.innerWidth, window.innerHeight)
+
+      renderer.domElement.addEventListener('touchstart', function(e) { isMoving = true; e.preventDefault() })
+      renderer.domElement.addEventListener('touchend', function(e) { isMoving = false; e.preventDefault() })
+      renderer.domElement.addEventListener('touchcancel', function(e) { isMoving = false; e.preventDefault() })
+      renderer.domElement.addEventListener('touchleave', function(e) { isMoving = false; e.preventDefault() })
+
       document.body.appendChild(renderer.domElement)
     }
 
@@ -64,8 +95,25 @@
             if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
             if(frameData.pose.orientation) camera.quaternion.fromArray(frameData.pose.orientation)
 
-            var hits = cursor.update(scene.children)
-            if(hits.length > 0) {
+            if(isMoving) {
+              camera.translateZ(-0.2)
+              portals.position.copy(camera.position)
+            }
+
+            var hits = cursor.update(portals)
+            if(hits.length > 0 && !isColliding) {
+              console.log(hits[0].object.uuid)
+              if(hits[0].object.uuid === portalMadmen.uuid) {
+                isColliding = true
+                setupScene('madmen')
+              } else if(hits[0].object.uuid === portalCorehouse.uuid) {
+                isColliding = true
+                setupScene('corehouse')
+              } else if(hits[0].object.uuid === portalStahlhouse.uuid) {
+                isColliding = true
+                setupScene('stahlhouse')
+              }
+
               cursor.cursor.material.color.setHex(0x00ffff)
             } else {
               cursor.cursor.material.color.setHex(0x008888)
@@ -79,16 +127,25 @@
     }
 
     function setupScene(which) {
+      console.log('Loading ' + which)
+      scene.remove(portals)
+      camera.position.set(0, 0, 0)
+      portals.position.copy(camera.position)
+      holodeck.scale.set(0.5, 0.5, 0.5)
       scene.add(holodeck)
       if(model) scene.remove(model)
       holodeck.position.copy(camera.position)
 
       var loader = new THREE.GLTFLoader()
       loader.load(which + '/' + which + '.gltf', function(gltf) {
-        gltf.scene.position.y = -1.6
+        if(which === 'madmen') gltf.scene.position.set(1.2, -1.6, -3.4)
+        else gltf.scene.position.y = -1.6
+
         scene.add(gltf.scene)
         scene.remove(holodeck)
+        scene.add(portals)
         model = gltf.scene
+        isColliding = false
       })
     }
 
@@ -100,7 +157,7 @@
     document.querySelector('button').addEventListener('click', function() {
       removeButtons()
       init()
-      setupScene('stahlhouse')
+      holodeck.scale.set(5, 2, 5)
       startVR()
     })
 
