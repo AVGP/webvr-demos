@@ -12,7 +12,7 @@ var VrCursor = function(parent) {
 
   this.update = function(objects) {
     raycaster.set(parent.position, parent.getWorldDirection());
-    return raycaster.intersectObjects(objects);
+    return raycaster.intersectObjects(objects, true);
   };
 
   return this;

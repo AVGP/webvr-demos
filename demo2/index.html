@@ -100,7 +100,7 @@
               portals.position.copy(camera.position)
             }
 
-            var hits = cursor.update(portals)
+            var hits = cursor.update([portals])
             if(hits.length > 0 && !isColliding) {
               console.log(hits[0].object.uuid)
               if(hits[0].object.uuid === portalMadmen.uuid) {
