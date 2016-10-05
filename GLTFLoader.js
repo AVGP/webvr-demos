@@ -6,6 +6,8 @@
 
 (function() {
 
+"use strict";
+
 THREE.GLTFLoader = function( manager ) {
 
 	this.manager = ( manager !== undefined ) ? manager : THREE.DefaultLoadingManager;
