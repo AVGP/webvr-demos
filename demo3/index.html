@@ -176,7 +176,7 @@
       ]
       for(var i=0; i<5; i++) {
         var pill = new Pill()
-        pill.setPosition(Math.random() * 6 - 3, 0, Math.random() * 2 - 1)
+        pill.setPosition(Math.random() * 2 - 1, 0, Math.random() * 6 - 3)
         pill.setColor(pillColors[i])
         scene.add(pill.object)
         pills.push(pill.object)
@@ -186,7 +186,7 @@
       init()
       startVR()
 
-      camera.position.set(Math.random() * 6 - 3, 0, 2 + Math.random() * 2 - 1)
+      camera.position.set(Math.random() * 4 - 2, 0, 2 + Math.random() * 2 - 1)
 
       alert('Your room ID is ' + peer.id)
 
@@ -224,7 +224,7 @@
       removeButtons()
       init()
 
-      camera.position.set(Math.random() * 6 - 3, 0, (Math.random() * 2 - 1) - 2)
+      camera.position.set(Math.random() * 2 - 1, 0, (Math.random() * 2 - 1) - 2)
 
       connection = peer.connect(window.prompt('What room ID to join?', ''))
       startVR()
