@@ -4,9 +4,9 @@
   <title>Demo 3: Ghost party</title>
   <style>
     button {
-      font-size: 10em;
-      width: 5em;
-      height: 2em;
+      font-size: 3em;
+      width:  50vh;
+      height: 30vh;
     }
   </style>
 </head>
@@ -37,7 +37,11 @@
           })
         ),
         ghost = null,
-        pills = [], otherGhosts = {}, isMoving = false, connection = null, previousPos = {position: new THREE.Vector3(), orientation: new THREE.Vector3()}
+        pills = [], otherGhosts = {},
+        isMoving = false,
+        isHost = false,
+        connections = {},
+        previousPos = { position: new THREE.Vector3(), orientation: new THREE.Vector3() }
 
     var peer = new Peer(getRoomId(), {key: '7nxxqfxzhestt9'});
 
@@ -62,30 +66,43 @@
     }
 
     function handleMsg(connection, msg) {
-      if(!otherGhosts[connection.peer]) {
-        otherGhosts[connection.peer] = ghost.clone()
-        scene.add(otherGhosts[connection.peer])
-
-        connection.send({
-          type: 'move',
-          position: camera.position.toArray(),
-          orientation: camera.quaternion.toArray()
-        })
-      }
-
+      console.log('recv', msg.type)
       switch(msg.type) {
         case 'init':
+          connection.send({
+            type: 'move',
+            position: camera.position.toArray(),
+            orientation: camera.quaternion.toArray()
+          })
           var pillData = msg.pills
           for(var i=0; i<pillData.length; i++) {
             var pill = new Pill()
-            pill.position.fromArray(pillData[i])
-            scene.add(pill)
+            pill.setPosition(pillData[i].position[0], pillData[i].position[1], pillData[i].position[2])
+            pill.setColor(pillData[i].emissive)
+
+            scene.add(pill.object)
             pills.push(pill)
           }
         break
         case 'move':
-          otherGhosts[connection.peer].position.fromArray(msg.position)
-          otherGhosts[connection.peer].quaternion.fromArray(msg.orientation)
+          if(!msg.playerId) break
+          if(!otherGhosts[msg.playerId]) {
+            console.log('adding player', msg.playerId)
+            otherGhosts[msg.playerId] = ghost.clone()
+            scene.add(otherGhosts[msg.playerId])
+          }
+
+          otherGhosts[msg.playerId].position.fromArray(msg.position)
+          otherGhosts[msg.playerId].quaternion.fromArray(msg.orientation)
+
+          if(isHost) {
+            var playerKeys = Object.keys(connections)
+            for(var i=0; i<playerKeys.length; i++) {
+              if(playerKeys[i] === msg.playerId) continue
+              connections[playerKeys[i]].send(msg)
+            }
+          }
+
         break
       }
     }
@@ -121,12 +138,16 @@
 //            if(frameData.pose.position) camera.position.fromArray(frameData.pose.position)
             if(frameData.pose.orientation) camera.quaternion.fromArray(frameData.pose.orientation)
 
-            if(connection && (previousPos.position.distanceTo(camera.position) > 0.1 || previousPos.orientation.distanceTo(camera.rotation.toVector3()) > 0.1)) {
-              connection.send({
-                type: 'move',
-                position: camera.position.toArray(),
-                orientation: camera.quaternion.toArray()
-              })
+            if((previousPos.position.distanceTo(camera.position) > 0.1 || previousPos.orientation.distanceTo(camera.rotation.toVector3()) > 0.1)) {
+              var connectionKeys = Object.keys(connections)
+              for(var i=0; i<connectionKeys.length; i++) {
+                connections[connectionKeys[i]].send({
+                  type: 'move',
+                  playerId: peer.id,
+                  position: camera.position.toArray(),
+                  orientation: camera.quaternion.toArray()
+                })
+              }
               previousPos.position = camera.position.clone()
               previousPos.orientation = camera.rotation.toVector3()
             }
@@ -140,9 +161,12 @@
               if(camera.position.z < -3.8) camera.position.z = -3.8
               else if(camera.position.z > 3.8) camera.position.z = 3.8
 
-              if(connection) {
-                connection.send({
+              var connectionKeys = Object.keys(connections)
+              for(var i=0; i<connectionKeys.length; i++) {
+
+                connections[connectionKeys[i]].send({
                   type: 'move',
+                  playerId: peer.id,
                   position: camera.position.toArray(),
                   orientation: camera.quaternion.toArray()
                 })
@@ -167,6 +191,8 @@
 
     document.querySelector('#host').addEventListener('click', function() {
 
+      isHost = true
+
       var pillColors = [
         [0, 1, 1],
         [1, 0, 1],
@@ -179,7 +205,7 @@
         pill.setPosition(Math.random() * 2 - 1, 0, Math.random() * 6 - 3)
         pill.setColor(pillColors[i])
         scene.add(pill.object)
-        pills.push(pill.object)
+        pills.push(pill)
       }
 
       removeButtons()
@@ -191,28 +217,47 @@
       alert('Your room ID is ' + peer.id)
 
       peer.on('connection', function(conn) {
-        connection = conn
+        conn.on('data', function(msg) {
+          handleMsg(conn, msg)
+        })
 
-        connection.send({
-          type: 'init',
-          pills: pills.map(function(pill) {
-            return {
-              position: pill.position.toArray(),
-              emissive: pill.material.emissive.toArray()
-            }
+        setTimeout(function() { // the fucking WHAT
+          conn.send({
+            type: 'init',
+            pills: pills.map(function(pill) {
+              return {
+                position: pill.getPosition(),
+                emissive: pill.getColor()
+              }
+            })
           })
-        })
+          conn.send({
+            type: 'move',
+            playerId: peer.id,
+            position: camera.position.toArray(),
+            orientation: camera.quaternion.toArray()
+          })
 
-        connection.send({
-          type: 'move',
-          position: camera.position.toArray(),
-          orientation: camera.quaternion.toArray()
-        })
+          var connectionKeys = Object.keys(connections)
+          for(var i=0; i<connectionKeys.length; i++) {
+            connections[connectionKeys[i]].send({
+              type: 'move',
+              playerId: conn.peer,
+              position: camera.position.toArray(),
+              orientation: camera.quaternion.toArray()
+            })
+            conn.send({
+              type: 'move',
+              playerId: connectionKeys[i],
+              position: camera.position.toArray(),
+              orientation: camera.quaternion.toArray()
+            })
+          }
 
-        connection.on('data', function(msg) {
-          console.log(msg)
-          handleMsg(connection, msg)
-        })
+          connections[conn.peer] = conn
+
+        }, 1000)
+
       })
     })
 
@@ -227,20 +272,21 @@
       camera.position.set(Math.random() * 2 - 1, 0, (Math.random() * 2 - 1) - 2)
 
       connection = peer.connect(window.prompt('What room ID to join?', ''))
+      connections[connection.peer] = connection
       startVR()
 
       connection.on('open', function() {
-
-        connection.send({
-          type: 'move',
-          position: camera.position.toArray(),
-          orientation: camera.quaternion.toArray()
-        })
-
         connection.on('data', function(msg) {
+          console.log('data', msg)
           handleMsg(connection, msg)
         })
 
+        connection.send({
+          type: 'move',
+          playerId: peer.id,
+          position: camera.position.toArray(),
+          orientation: camera.quaternion.toArray()
+        })
       })
 
     })

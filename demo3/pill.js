@@ -13,8 +13,13 @@ var Pill = function() {
       light.color.fromArray(colorArray);
     },
     setPosition: function(x, y, z) {
-      pill.position.set(x, y, z)
-      light.position.set(x, y, z)
+      root.position.set(x, y, z);
+    },
+    getPosition: function() {
+      return root.position.toArray();
+    },
+    getColor: function() {
+      return pill.material.emissive.toArray();
     }
   };
 };
