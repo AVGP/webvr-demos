@@ -31,12 +31,33 @@
           new THREE.BoxGeometry(2, 2, 2),
           new THREE.MeshBasicMaterial({
             side: THREE.BackSide,
-            map: THREE.ImageUtils.loadTexture('floor.jpg')
+            map: THREE.ImageUtils.loadTexture('floor.jpg'),
+            transparent: true,
+            opacity: 1
           })
         ),
         portals = new THREE.Object3D(),
         cursor = new VrCursor(camera)
         model = null, isMoving = false, isColliding = false
+
+    var scenes = {}
+
+    var loader1 = new THREE.GLTFLoader()
+    loader1.load('stahlhouse/stahlhouse.gltf', function(gltf) {
+//      if(which === 'madmen') gltf.scene.position.set(1.2, -1.6, -3.4)
+      gltf.scene.position.y = -1.6
+      scenes.stahlhouse = gltf.scene
+    })
+    var loader2 = new THREE.GLTFLoader()
+    loader2.load('madmen/madmen.gltf', function(gltf) {
+      gltf.scene.position.set(1.2, -1.6, -3.4)
+      scenes.madmen = gltf.scene
+    })
+    var loader3 = new THREE.GLTFLoader()
+    loader3.load('corehouse/corehouse.gltf', function(gltf) {
+      gltf.scene.position.set(1.2, -1.6, -3.4)
+      scenes.corehouse = gltf.scene
+    })
 
     var portalStahlhouse = new THREE.Mesh(
       new THREE.OctahedronGeometry(0.2),
@@ -72,6 +93,9 @@
       renderer.domElement.addEventListener('touchend', function(e) { isMoving = false; e.preventDefault() })
       renderer.domElement.addEventListener('touchcancel', function(e) { isMoving = false; e.preventDefault() })
       renderer.domElement.addEventListener('touchleave', function(e) { isMoving = false; e.preventDefault() })
+      renderer.domElement.addEventListener('mousedown', function(e) { isMoving = true; e.preventDefault() })
+      renderer.domElement.addEventListener('mouseup', function(e) { isMoving = false; e.preventDefault() })
+
 
       document.body.appendChild(renderer.domElement)
     }
@@ -132,10 +156,27 @@
       camera.position.set(0, 0, 0)
       portals.position.copy(camera.position)
       holodeck.scale.set(0.5, 0.5, 0.5)
+      holodeck.material.opacity = 1
       scene.add(holodeck)
+
       if(model) scene.remove(model)
       holodeck.position.copy(camera.position)
 
+      if(scenes[which]) {
+        model = scenes[which]
+        scene.add(model)
+        setTimeout(function fade() {
+          if(holodeck.material.opacity > 0.1) {
+            holodeck.material.opacity -= 0.1
+            setTimeout(fade, 50)
+          } else {
+            scene.remove(holodeck)
+            scene.add(portals)
+            isColliding = false
+          }
+        },50)
+        return
+      }
       var loader = new THREE.GLTFLoader()
       loader.load(which + '/' + which + '.gltf', function(gltf) {
         if(which === 'madmen') gltf.scene.position.set(1.2, -1.6, -3.4)
